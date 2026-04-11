@@ -1,0 +1,13 @@
+/config/config.json
+/config/messages
+/servers
+/ACSERVERS(0.52)
+/ignore
+/html
+log.txt
+/config/config.yaml
+*.log
+__pycache__
+/NewAceservers
+/test
+/test/*

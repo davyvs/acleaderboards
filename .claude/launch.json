@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Leaderboard Bot",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["src/leaderboard.py"],
+      "port": null
+    },
+    {
+      "name": "Caddy File Server",
+      "runtimeExecutable": "caddy.exe",
+      "runtimeArgs": ["file-server", "-r", "html", "--listen", "0.0.0.0:8888", "--templates", "--browse"],
+      "port": 8888
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+@echo off
+start "caddy webserver" /D "C:\Users\Davyv\Desktop\Latest Stable Medic Junk\Assetto-corsa-discord-leaderboard-experimental\Assetto-corsa-discord-leaderboard-experimental" caddy.exe file-server -r html --listen 0.0.0.0:8888 --templates --browse
