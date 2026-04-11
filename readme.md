@@ -1,88 +1,138 @@
-# what does it do:
-a server sided script that reads logs from assettoserver and acServer for lap times, stage times (found on shutoko), shmoovin score entries and general server information and posts them to a leaderboard posted via discord webhooks aswell as html files in a html folder to use as live overlays in obs.
+# AC Leaderboard Bot
 
-it makes as many messages as there are servers and will delete them if the server no longer exsists.
+A server-side Python script that monitors Assetto Corsa / AssettoServer log files and posts live leaderboards to Discord via webhooks. Also generates HTML overlay files for use in OBS.
 
-it loops trough a parent folder housing all servers and uses a configurable identifier to identify server folders. if it sees a server folder it looks in that folder for a logs folder or a results folder where it will then loop trough the last log file to find score entries. it will NOT work with different folder structures (example below). it saves the scores and laptimes to a leaderboard txt and a laptimes txt in the root of the server wich can be added manually to remove or reset scores.
+![screenshot](screenshot6.png)
+![screenshot](screenshot7.png)
 
-If there is no shmoovin script present in the csp config in the server folders cfg folder it will not trigger and leave the folder alone.
-It gets the server name from the server config.
+---
 
-if there are too much characters in the discord message the bot will first shorten usernames and remove unneeded spaces, if this does not stay below the limit it will start limiting the amount of entries in the leaderboard until it fits. to avoid this limit the amount of text displayed in the discord message by removing classes, stages or the amount of entries
+## What it does
 
-laptimes and full server info can be set on or off in the configs as described below.
+- Loops through a parent folder containing all your server folders
+- Identifies server folders using a configurable string (e.g. `(server`)
+- For each server, scans the latest log file(s) for:
+  - **Lap times** — from standard AC/AssettoServer log output
+  - **Stage/sector times** — from Shutoko-style sector splits
+  - **Drift scores** — via the Shmoovin drift Lua script (CSP)
+  - **Overtake scores** — via the Shmoovin overtake Lua script (CSP)
+- Posts one Discord embed per server and keeps it updated (edit, not repost)
+- Deletes the Discord message if a server folder is removed
+- Generates HTML files per server in the `html/` folder for live OBS overlays
+- Reads the server name from the server's `server_cfg.ini`
+- Detects which Shmoovin script is active by checking `cfg/csp_extra_options.ini`
+- Automatically shortens usernames and trims entries if the Discord message exceeds the character limit
+- Filters usernames against a configurable banned words list
 
-# screenshots
+---
 
-![alt text](screenshot6.png)
+## Requirements
 
-![alt text](screenshot7.png)
-
-# how to use:
-1. install python on your system from the python website https://www.python.org/downloads/ make sure to select add python to path
-2. install the requests module trough pip with the following command in a terminal
+- Python 3
+- `requests` library:
 ```
-python -m pip install requests
-```
-3. in the config folder copy the provided example_config.json and rename it to config.json
-4. configure the config.json as needed:
-```
-{
-    "interval": time in minutes on how often the script should update the leaderboards,
-    "serverspath": ["path/to/server_parent_folder1", "path/to/server_parent_folder2"],
-    "folderindentifier": "identifier to recognize server folder",
-    "leaderboardlimit": how much entries should be displayed on the leaderboard,
-    "webhookurl":"url to your discord webhook",
-    "shmoovindrifturl":["url to drift script"],
-    "shmoovinovertakeurl":["url to overtake script"],
-    "serveradress":"ip adress of server",
-    "serveradressdisplay":"ip adress used in bot messages and link (incase serveradress is localhost)",
-    "onlyleaderboards":"wether or not to show the full server info or leadeboards only, set to "true" or "false" "
-    "show_input": "shows input method used by the driver, "true" or "false"",
-    "verbose": "set script output to verbose for debugging "true" or "false""
-    "log_to_file": "logs all output to a file for debugging "true" or "false" WARNING does not limit filesize yet"
-}
-```
-5. save the file and run the script:   
-on windows: with the provided start.bat file OR trough a terminal with "python leaderboard.py".   
-on linux: in the terminal with "python leaderboard.py".   
-
-* alternativly you can build your own docker image with the dockerfile provided or use mine with the following command
-```
-docker run -dit --name shmoovin-discord-leaderboard -v /path/to/assetto/servers:/usr/src/app/servers -v /path/to/config:/usr/src/app/config keyboardmedic/shmoovin-discord-leaderboard:latest
-```
-* example folder structure with the identifier set as "(server" :  
--> Assetto servers  
---> (server 1) this is a server  
----> logs  
---> (server 2) this is another server  
----> logs
--> acServers   
---> (server 3) this is yet another server  
----> results  
-
-# extra configuration options
-
-* optionally to ignore laptimes, shmoovin scores or sort by class for a certain server you can create a file in the server root with the name "discordbotcfg.json"
-in the file add the following lines, an example can be found in the config folder, to define wich car goes in what class make a class entry like above and add the classnames for the car in there within "" seperated by , :
-```
-{
-"showlaptimes":"True",
-"showshmoovin":"False"
-"classes":{
-    "2017":["ks_ferrari_sf70h"],
-    "2010":["lotus_exos_125_s1"],
-    "2004":["ks_ferrari_f2004"],
-    "80s":["lotus_98t"],
-    "70s":["ferrari_312t","ks_lotus_72d"],
-    "60s":["ks_ferrari_312_67","lotus_49"]
-    }
-}
+pip install requests
 ```
 
-* should not be needed but just in case: to remove or resend a leaderboard delete all txt files in the folder ./config/messages and manually delete the leaderboard message on discord .
+---
 
-* to remove an entry from the leaderboards delete the entry in the corresponding file (leaderboard.txt or laptimes.txt in the server root) and delete the corresponding log line in the logs
+## Setup
 
-# disclaimer
-scripts are written by an amateur, use at your own risk...
+1. Copy `config/config.yaml` (or create one based on the options below) and fill in your values
+2. Run the script:
+   - **Windows:** double-click `start.bat`
+   - **Linux/terminal:** `python src/leaderboard.py`
+3. Optionally serve the `html/` folder with Caddy using `start caddy.bat` (port 8888)
+
+---
+
+## config/config.yaml
+
+```yaml
+interval: 2                          # how often to update leaderboards (minutes)
+servers_pathlst:
+  - C:\path\to\your\acservers        # one or more parent folders containing server folders
+folder_identifier: "(server"         # string used to identify server subfolders
+leaderboard_limit: 10                # max entries shown per leaderboard
+web_hook_url: "https://discord.com/api/webhooks/..." 
+server_adress: 127.0.0.1             # actual server IP (used internally)
+server_adress_display: my.server.com # IP/hostname shown in Discord messages
+only_leaderboards: false             # true = hide full server info, show scores only
+show_input: true                     # show input method (Wheel / Gamepad / Unknown)
+use_short_name: false                # shorten long usernames to save space
+log_lookback: 5                      # how many recent log files to scan
+max_errors_allowed: 4                # how many consecutive errors before skipping a server
+drift_script:
+  - "https://pastebin.com/raw/..."   # URL(s) of your drift Lua script
+overtake_script:
+  - "https://pastebin.com/raw/..."   # URL(s) of your overtake Lua script
+banned_words:
+  - someusername                     # usernames to filter from leaderboards
+```
+
+---
+
+## Per-server config (optional)
+
+Create a `discordbotcfg.yaml` in a server's root folder to override behaviour for that server:
+
+```yaml
+show_laptimes: true
+show_shmoovin: false
+show_sectors: true
+classes:
+  F2004: ["ks_ferrari_f2004"]
+  Lotus: ["lotus_49", "ks_lotus_72d"]
+```
+
+---
+
+## Folder structure
+
+The script expects this layout (example with `folder_identifier: "(server"`):
+
+```
+Assetto Servers/
+  (server01) My First Server/
+    logs/
+    cfg/
+    leaderboard.txt       <- created automatically
+    laptimes.txt          <- created automatically
+  (server02) My Second Server/
+    results/
+    cfg/
+```
+
+---
+
+## HTML overlays
+
+HTML files are generated in the `html/` folder — one set per server:
+- `<server>-times.html` — lap times leaderboard
+- `<server>-shmoovin.html` — drift or overtake scores
+- `<server>-sectors.html` — sector times
+
+Serve the `html/` folder with Caddy (included) and add a Browser Source in OBS pointing to the relevant file. The page auto-refreshes every 10 seconds.
+
+---
+
+## Docker
+
+```
+docker run -dit --name ac-leaderboard \
+  -v /path/to/acservers:/usr/src/app/servers \
+  -v /path/to/config:/usr/src/app/config \
+  keyboardmedic/shmoovin-discord-leaderboard:latest
+```
+
+---
+
+## Manual fixes
+
+- **Remove a score:** delete the entry from `leaderboard.txt` or `laptimes.txt` in the server folder
+- **Reset a leaderboard message:** delete all `.txt` files in `config/messages/` and manually delete the message on Discord
+- **Remove a log entry:** delete the relevant line from the server's log file
+
+---
+
+*Written by an amateur, use at your own risk.*
