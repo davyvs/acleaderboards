@@ -137,4 +137,12 @@ docker run -dit --name ac-leaderboard \
 
 ---
 
-*Written by an amateur, use at your own risk.*
+---
+
+## Credits
+
+Big shoutout to [KeyboardMedic](https://github.com/keyboardmedicNL) — this project is built on top of his original work. Go check him out!
+
+---
+
+*Written by amateurs, use at your own risk.*
