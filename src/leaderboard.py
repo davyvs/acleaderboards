@@ -921,7 +921,7 @@ def format_webhook(combined_server_path_rel: str, main_loop_counter: int, shmoov
 
     fields_post = {
                 "name": "",
-                "value": "[***get this bot***](https://github.com/keyboardmedicNL/Assetto-corsa-discord-leaderboard)"
+                "value": "[***get this bot***](https://github.com/davyvs/acleaderboards)"
             }
         
     fields_sectors = []
