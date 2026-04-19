@@ -118,11 +118,13 @@ Serve the `html/` folder with Caddy (included) and add a Browser Source in OBS p
 
 ## Docker
 
+Build the image yourself from the provided `dockerfile`:
 ```
+docker build -t ac-leaderboard .
 docker run -dit --name ac-leaderboard \
   -v /path/to/acservers:/usr/src/app/servers \
   -v /path/to/config:/usr/src/app/config \
-  keyboardmedic/shmoovin-discord-leaderboard:latest
+  ac-leaderboard
 ```
 
 ---
