@@ -21,42 +21,52 @@ def error_counter(error_count: int) -> tuple[int, int]:
 
     return(error_count, remaining_errors)
 
+REQUEST_TIMEOUT = 30
+
+def _mask_url(url: str) -> str:
+    """Mask sensitive parts of webhook URLs before logging."""
+    if url and "/webhooks/" in url:
+        parts = url.split("/webhooks/")
+        return parts[0] + "/webhooks/***"
+    return url
+
 def handle_request_error(request_type: str="get", request_url: str=None, request_data: any=None, request_json: any=None, request_params: any=None, request_headers: any=None, status_type_ok: list=[200] ) -> object:
-    
+
     error_count = 0
+    masked_url = _mask_url(request_url)
 
     while error_count < max_errors_allowed:
 
         try:
             if request_type == "get":
-                request_response = requests.get(request_url, headers=request_headers)
+                request_response = requests.get(request_url, headers=request_headers, timeout=REQUEST_TIMEOUT)
 
             elif request_type == "post":
-                request_response = requests.post(request_url, data=request_data, json=request_json, params=request_params)
+                request_response = requests.post(request_url, data=request_data, json=request_json, params=request_params, timeout=REQUEST_TIMEOUT)
 
             elif request_type == "patch":
-                request_response = requests.patch(request_url, data=request_data, json=request_json, params=request_params)
+                request_response = requests.patch(request_url, data=request_data, json=request_json, params=request_params, timeout=REQUEST_TIMEOUT)
 
             elif request_type == "delete":
-                request_response = requests.delete(request_url, params=request_params)
+                request_response = requests.delete(request_url, params=request_params, timeout=REQUEST_TIMEOUT)
 
 
             if request_response.status_code in status_type_ok:
                 return request_response
-            
+
             else:
                 error_count, remaining_errors = error_counter(error_count)
 
-                logging.error("unable to complete request of type: %s with url: %s and expected status return: %s response: %s trying %s more times and waiting for %s seconds",request_type, request_url, str(status_type_ok), request_response, remaining_errors , time_before_retry)
-                
+                logging.error("unable to complete request of type: %s with url: %s and expected status return: %s response: %s trying %s more times and waiting for %s seconds",request_type, masked_url, str(status_type_ok), request_response, remaining_errors , time_before_retry)
+
                 if error_count != max_errors_allowed:
                     time.sleep(time_before_retry)
 
         except Exception as e:
                 error_count, remaining_errors = error_counter(error_count)
 
-                logging.error("unable to complete request of type: %s with url: %s and expected status return: %s exception: %s trying %s more times and waiting for %s seconds",request_type, request_url, str(status_type_ok), e, remaining_errors , time_before_retry)
-                
+                logging.error("unable to complete request of type: %s with url: %s and expected status return: %s exception: %s trying %s more times and waiting for %s seconds",request_type, masked_url, str(status_type_ok), e, remaining_errors , time_before_retry)
+
                 if error_count != max_errors_allowed:
                     time.sleep(time_before_retry)
 

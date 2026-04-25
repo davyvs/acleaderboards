@@ -15,6 +15,7 @@ import datetime
 from datetime import timezone
 import sys
 import yaml
+import unicodedata
 import requests_error_handler
 import config_loader
 
@@ -162,7 +163,12 @@ def has_score_file_check(file_name: str,combined_server_path_rel: str):
 def score_find(selected_log: str, previous_log: str, combined_server_path_rel: str):
     logging.debug(f"Checking log for score entries")
 
-    with open(str(selected_log), encoding='utf-8', errors='ignore') as log_file:
+    MAX_LOG_SIZE_MB = 100
+    if os.path.getsize(str(selected_log)) > MAX_LOG_SIZE_MB * 1024 * 1024:
+        logging.warning(f"Log file {selected_log} exceeds {MAX_LOG_SIZE_MB}MB, skipping")
+        return
+
+    with open(str(selected_log), encoding='utf-8', errors='replace') as log_file:
         selected_log_lines = log_file.readlines()
 
     for index_log_line,log_line in enumerate(selected_log_lines):
@@ -217,7 +223,7 @@ def score_find(selected_log: str, previous_log: str, combined_server_path_rel: s
             
         elif stage_match := (re.findall(".* \[DBG\] Stage (.*) ended for (.*) \(\d*\), time: (.*)", log_line)):
             logging.debug(f"found sector time on: {log_line.strip()}")
-            leaderboard_file_name = str(stage_match[0][0]) + "-sector.txt"
+            leaderboard_file_name = os.path.basename(sanitize_filename(str(stage_match[0][0]))) + "-sector.txt"
             name = str(stage_match[0][1])
             score = str(stage_match [0][2])
             score_find_additional(name, score, leaderboard_file_name, index_log_line, selected_log, previous_log, combined_server_path_rel)
@@ -446,16 +452,28 @@ def find_time_vanilla(combined_server_path_rel):
     except Exception as e:
         logging.debug("An exception occurred attempting to find scores for a ACServer.exe server: ", str(e))
 
+def normalize_text(text: str) -> str:
+    """Normalize unicode to catch bypass attempts with lookalike characters."""
+    return unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
+
+def sanitize_for_discord(text: str) -> str:
+    """Escape Discord markdown special characters to prevent injection."""
+    for char in ['*', '_', '`', '[', ']', '~', '|']:
+        text = text.replace(char, '\\' + char)
+    return text
+
 # checks if name is on banned names list
 def check_name(name_to_check: str) -> bool:
     logging.debug(f"checking {name_to_check} to see if it matches any banned words")
     logging.debug(f"list of banned words to check against:\n{config.banned_words}")
     allowed = True
+    normalized_name = normalize_text(name_to_check).lower()
     for banned_word in config.banned_words:
-        if banned_word.lower() in name_to_check.lower():
+        normalized_banned = normalize_text(banned_word).lower()
+        if normalized_banned in normalized_name:
             allowed = False
             logging.debug(f"Found banned word: {banned_word} in the name: {name_to_check}\n")
-            
+
     return(allowed)
 
 def sort_score(score_type: str, classcfg: dict, combined_server_path_rel: str) -> list:
@@ -675,19 +693,20 @@ def format_scores(scores, classcfg, score_type: str, show_input_discord: bool, u
                 elif run_time and combo_peak:
                     extra_info = f" | {run_time} | {combo_peak}x"
                 
+                safe_name = sanitize_for_discord(str(classcore[1]))
                 if show_input_discord and not use_short_name and server_type != "acserver":
-                    class_scores.append(f"{scorecounter}. {classcore[1]} - {score_input} - {score_format}{extra_info}\n")
-                
+                    class_scores.append(f"{scorecounter}. {safe_name} - {score_input} - {score_format}{extra_info}\n")
+
                 elif show_input_discord and use_short_name and server_type != "acserver":
-                    short_name = str(classcore[1])[0:6]
+                    short_name = safe_name[0:6]
                     class_scores.append(f"{scorecounter}.{short_name} {score_input} {score_format}{extra_info}\n")
-                
+
                 elif use_short_name:
-                    short_name = str(classcore[1])[0:6]
+                    short_name = safe_name[0:6]
                     class_scores.append(f"{scorecounter}.{short_name} {score_format}{extra_info}\n")
 
                 else:
-                    class_scores.append(f"{scorecounter}. {classcore[1]} - {score_format}{extra_info}\n")
+                    class_scores.append(f"{scorecounter}. {safe_name} - {score_format}{extra_info}\n")
                 
                 short_name = str(classcore[1])[0:6]
                 html_score_format = f"<b>{short_name}</b> {score_format}{extra_info}"
@@ -867,7 +886,7 @@ def format_webhook(combined_server_path_rel: str, main_loop_counter: int, shmoov
         http_port = str(configp['SERVER']['HTTP_PORT'])
         serverhttp = f"{config.server_adress}:{http_port}"
         try:
-            rl = requests.get(f"http://{serverhttp}/INFO")
+            rl = requests.get(f"http://{serverhttp}/INFO", timeout=10)
             logging.debug(f"server info response is: {rl} for server {combined_server_path_rel}")
 
             if "200" in str(rl):
